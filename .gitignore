@@ -1,0 +1,12 @@
+all_makefiles
+.vscode
+__pycache__
+generatedMakefiles
+migrations
+old_Makefiles
+all_targets.lst
+steps_importer.py
+find_files.py
+.idea/
+.teamcity/.idea
+.teamcity/target

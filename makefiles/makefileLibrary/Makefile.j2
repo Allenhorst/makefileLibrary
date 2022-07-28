@@ -1,0 +1,85 @@
+
+.DEFAULT_GOAL := help
+.PHONY: build push list
+
+help: ## This help.
+		@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "\033[36m%-29s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+
+# list all targets
+{{ ruleslist.list_targets }}
+
+
+
+## General setting
+UPSTREAM_PROJECT := makefilelibrary
+DOCKER_EXEC := $(shell which docker)
+GIT_EXEC := $(shell which git)
+VERSION := v1
+
+
+export DOCKER_REGISTRY?=hub.docker.com
+export APP_NAME=example-$(UPSTREAM_PROJECT)
+export OUTPUT_DIR=all_makefiles
+
+
+env:
+		$(eval IMAGE_NAME=$(DOCKER_REGISTRY)/$(APP_NAME))
+		$(eval IMAGE_VERSION=$(VERSION))
+		$(eval IMAGE_TAG=$(IMAGE_NAME):$(IMAGE_VERSION))
+		
+
+desc: env
+		@echo "Build docker image with all makefile templates"
+
+build: env ## Build local image
+		@($(DOCKER_EXEC) build --rm -f "Dockerfile" -t $(IMAGE_TAG) .)
+
+push: build ## Push local image to repository
+		@($(DOCKER_EXEC) push $(IMAGE_TAG))
+
+image_version: env
+	@echo $(IMAGE_VERSION))
+
+image_tag: env
+	@echo $(IMAGE_TAG)
+
+install_reqs_local:
+	@pip install -r requirements.txt
+
+
+generate_all_docker: image_tag
+	mkdir $(OUTPUT_DIR) && \
+	chmod 777 $(OUTPUT_DIR) && \
+	docker run -v $(pwd)/$(OUTPUT_DIR):/app/generatedMakefiles/:rw $(APP_NAME):$(IMAGE_VERSION) generate all generatedMakefiles
+
+build_project_docker: image_tag  ## use as <  make build_project_docker PROJECT=af-api>
+	PWD=$(pwd)
+	rmdir $(OUTPUT_DIR) && \
+	mkdir $(OUTPUT_DIR) && \
+	chmod 777 $(OUTPUT_DIR) && \
+	docker run -v $(PWD)/$(OUTPUT_DIR):/app/generatedMakefiles/:rw $(APP_NAME):$(IMAGE_VERSION) build $(PROJECT) generatedMakefiles
+
+generate_all_local: install_reqs_local
+	PWD=$(pwd)
+	python3 $(PWD)/main.py generate all --indir=makefiles --outdir=generatedMakefiles
+
+build_project_local: install_reqs_local ##use as <  make build_project_local PROJECT=af-api>
+	PWD=$(pwd)
+	python3 $(PWD)/main.py build $(PROJECT) --indir=makefiles --outdir=generatedMakefiles	
+
+
+build_migrations:install_reqs_local
+	PWD=$(pwd)
+	python3 $(PWD)/buildMigrationPlan.py 
+
+#generate_all_docker: image_tag
+#	mkdir $(OUTPUT_DIR) && \
+#	chmod 777 $(OUTPUT_DIR) && \
+#	docker run -v $(pwd)/$(OUTPUT_DIR):/app/$(OUTPUT_DIR):rw $(IMAGE_TAG) generate all $(OUTPUT_DIR)
+#
+#build_project_docker: image_tag  ## use as <  make build_project_docker PROJECT=af-api>
+#	rmdir $(OUTPUT_DIR) && \
+#	mkdir $(OUTPUT_DIR) && \
+#	chmod 777 $(OUTPUT_DIR) && \
+#	docker run -v $(pwd)/$(OUTPUT_DIR):/app/$(OUTPUT_DIR):rw $(IMAGE_TAG) build $(PROJECT) $(OUTPUT_DIR)
